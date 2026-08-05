@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Instalador do Harmonika&Co Karaokê (UltraStar Deluxe + tema da empresa) para Windows e Linux",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",

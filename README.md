@@ -137,6 +137,8 @@ ajusta o `PATH` só do processo filho. Mesmo efeito, sem deixar rastro na máqui
 
 ### Licença
 
+O código deste repositório é **MIT** — veja [LICENSE](LICENSE).
+
 O USDB Syncer é **GPL-3.0-only** e o ffmpeg do BtbN é um build GPL. Nenhum dos
 dois vai embutido neste repositório ou nos instaladores: os dois são baixados do
 release oficial na hora da instalação, exatamente como o UltraStar. Assim este
