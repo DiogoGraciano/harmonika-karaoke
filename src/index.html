@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Harmonika&Co Karaokê — Instalador</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="palco">
+      <header class="cabecalho">
+        <img class="marca" src="logo.png" alt="Harmonika&Co" />
+        <p class="produto">K A R A O K Ê</p>
+      </header>
+
+      <p class="tese">
+        Coloca o karaokê da empresa nesta máquina — o UltraStar Deluxe com o
+        tema da Harmonika&amp;Co já aplicado.
+      </p>
+
+      <!-- Assinatura: as etapas sao notas de karaoke que se preenchem
+           conforme a instalacao avanca, como uma nota sendo cantada. -->
+      <section class="melodia" aria-label="Etapas da instalação">
+        <ol class="notas" id="notas">
+          <li class="nota" data-fase="baixar" style="--alt: 0">
+            <span class="nota-trilho"><span class="nota-preenche"></span></span>
+            <span class="nota-nome">Baixar</span>
+          </li>
+          <li class="nota" data-fase="extrair" style="--alt: -18">
+            <span class="nota-trilho"><span class="nota-preenche"></span></span>
+            <span class="nota-nome">Extrair</span>
+          </li>
+          <li class="nota" data-fase="marca" style="--alt: -34">
+            <span class="nota-trilho"><span class="nota-preenche"></span></span>
+            <span class="nota-nome">Aplicar a marca</span>
+          </li>
+          <li class="nota" data-fase="configurar" style="--alt: -18">
+            <span class="nota-trilho"><span class="nota-preenche"></span></span>
+            <span class="nota-nome">Configurar</span>
+          </li>
+          <li class="nota" data-fase="atalho" style="--alt: 0">
+            <span class="nota-trilho"><span class="nota-preenche"></span></span>
+            <span class="nota-nome">Criar o atalho</span>
+          </li>
+        </ol>
+      </section>
+
+      <p class="andamento" id="andamento" aria-live="polite">
+        <span class="ponto" id="ponto"></span>
+        <span id="andamento-texto">Verificando esta máquina…</span>
+      </p>
+
+      <div class="acoes">
+        <button class="botao botao-principal" id="btn-instalar" type="button">
+          Instalar o karaokê
+        </button>
+        <button class="botao" id="btn-abrir" type="button" hidden>
+          Abrir o karaokê
+        </button>
+      </div>
+
+      <p class="recado" id="recado" hidden></p>
+
+      <section class="musicas" id="musicas" hidden>
+        <p class="rotulo">Músicas</p>
+        <p class="musicas-conta" id="musicas-conta"></p>
+        <button class="link" id="btn-pasta" type="button">
+          Abrir a pasta de músicas
+        </button>
+      </section>
+
+      <!-- O jukebox: o acervo do usdb.eu servido na rede local, para os
+           convidados procurarem musica pelo celular. -->
+      <section class="jukebox" id="jukebox" hidden>
+        <p class="rotulo">Jukebox</p>
+        <p class="jukebox-tese">
+          Põe o acervo do usdb.eu na rede da festa. Os convidados apontam a
+          câmera para o QR code e procuram música pelo próprio celular.
+        </p>
+
+        <p class="andamento" aria-live="polite">
+          <span class="ponto" id="jukebox-ponto"></span>
+          <span id="jukebox-texto">Verificando…</span>
+        </p>
+
+        <span class="nota-trilho jukebox-barra" id="jukebox-barra" hidden>
+          <span class="nota-preenche" id="jukebox-barra-preenche"></span>
+        </span>
+
+        <div class="acoes">
+          <button class="botao" id="btn-jukebox-instalar" type="button" hidden>
+            Instalar o jukebox
+          </button>
+          <button class="botao botao-principal" id="btn-jukebox-abrir" type="button" hidden>
+            Abrir o jukebox
+          </button>
+          <button class="botao" id="btn-jukebox-parar" type="button" hidden>
+            Parar o jukebox
+          </button>
+        </div>
+
+        <div class="palco-qr" id="jukebox-palco" hidden>
+          <div class="qr" id="jukebox-qr" role="img"
+               aria-label="QR code com o endereço do jukebox"></div>
+          <div class="qr-lado">
+            <p class="rotulo">Endereço na rede</p>
+            <p class="qr-endereco" id="jukebox-endereco"></p>
+            <p class="qr-dica" id="jukebox-dica"></p>
+          </div>
+        </div>
+
+        <button class="link" id="btn-jukebox-conta" type="button" hidden>
+          Abrir o sincronizador (conta do usdb.eu e download das músicas)
+        </button>
+
+        <p class="recado" id="jukebox-recado" hidden></p>
+      </section>
+
+      <details class="detalhes">
+        <summary>Onde as coisas ficam</summary>
+        <dl class="caminhos" id="caminhos"></dl>
+        <p class="nota-rodape" id="rodape-elevacao"></p>
+        <button class="link link-perigo" id="btn-desinstalar" type="button" hidden>
+          Desinstalar o karaokê
+        </button>
+      </details>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>

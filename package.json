@@ -1,0 +1,17 @@
+{
+  "name": "instalador-harmonika-karaoke",
+  "version": "1.0.0",
+  "description": "Instalador do Harmonika&Co Karaokê (UltraStar Deluxe + tema da empresa) para Windows e Linux",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:linux": "APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=true tauri build --bundles deb,appimage",
+    "build:windows": "PATH=\"$HOME/.cargo/bin:$PATH\" tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis",
+    "build:all": "npm run build:linux && npm run build:windows"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

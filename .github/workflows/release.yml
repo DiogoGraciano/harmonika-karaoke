@@ -1,0 +1,79 @@
+name: Release
+
+# Dispara ao empurrar uma tag v* (ex.: v1.0.0) e publica uma release
+# com os instaladores de Windows e Linux gerados nativamente por cada runner.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release (ex.: v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: "--bundles deb,appimage"
+          - platform: windows-latest
+            args: "--bundles nsis,msi"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependências (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl wget file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Instalar dependências npm
+        run: npm install
+
+      # Os testes cobrem a geracao do tema, que e o que faz o instalador
+      # entregar a identidade visual certa. Falhou aqui, nao publica.
+      - name: Testes do backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build + Release (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+          releaseName: "Harmonika&Co Karaokê ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          releaseBody: "Instalador do karaokê da empresa. Windows: .msi / .exe (NSIS). Linux: .deb / .AppImage. Não pede senha de administrador."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
