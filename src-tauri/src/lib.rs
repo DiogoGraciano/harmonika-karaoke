@@ -698,6 +698,85 @@ fn jukebox_stop(jukebox: State<'_, jukebox::Estado>) -> Result<jukebox::JukeboxS
     jukebox::parar(&jukebox)
 }
 
+/// As bibliotecas que vieram dentro do AppImage extraido, na frente do que o
+/// nosso proprio processo ja tiver.
+#[cfg(not(windows))]
+fn ld_library_path(p: &Paths) -> String {
+    let lib = p.app_dir.join("usr").join("lib");
+    match std::env::var("LD_LIBRARY_PATH") {
+        Ok(atual) if !atual.is_empty() => format!("{}:{atual}", lib.display()),
+        _ => lib.to_string_lossy().to_string(),
+    }
+}
+
+/// `SCHED_IDLE` do kernel: a classe de quem so roda quando ninguem mais quer a
+/// CPU.
+#[cfg(not(windows))]
+const SCHED_IDLE: i32 = 5;
+
+/// Politica de agendamento do processo atual, ou `None` se o `/proc` nao
+/// estiver do jeito esperado.
+#[cfg(not(windows))]
+fn politica_de_agendamento() -> Option<i32> {
+    politica_do_stat(&fs::read_to_string("/proc/self/stat").ok()?)
+}
+
+/// A politica e o campo 41 do `/proc/<pid>/stat`. A contagem comeca depois do
+/// ultimo `)` porque o campo 2 e o nome do executavel — que pode ter espacos e
+/// parenteses dentro e estragaria um `split` ingenuo da linha inteira.
+#[cfg(not(windows))]
+fn politica_do_stat(stat: &str) -> Option<i32> {
+    let depois_do_nome = &stat[stat.rfind(')')? + 1..];
+    // O primeiro campo depois do nome e o 3 (estado), entao o 41 e o indice 38.
+    depois_do_nome.split_whitespace().nth(38)?.parse().ok()
+}
+
+/// Inicia o karaoke por um servico transitorio do systemd do usuario.
+///
+/// `None` quando a maquina nao tem `systemd-run` — ai o jeito e tentar do
+/// modo normal, que ainda pode funcionar dependendo do `RLIMIT_NICE`.
+#[cfg(not(windows))]
+fn launch_pelo_systemd(p: &Paths) -> Option<Result<(), String>> {
+    let mut cmd = Command::new("systemd-run");
+    cmd.arg("--user")
+        .arg("--quiet")
+        // Sem isto o unit fica para tras depois que o karaoke fecha, e a
+        // proxima chamada esbarra num nome ja usado.
+        .arg("--collect")
+        .args(["-p", &format!("WorkingDirectory={}", p.app_dir.display())])
+        .args(["-p", "Nice=0"])
+        .args(["-p", "CPUSchedulingPolicy=other"])
+        .arg(format!("--setenv=LD_LIBRARY_PATH={}", ld_library_path(p)));
+
+    // O gerenciador de sessao costuma conhecer essas variaveis, mas nem todo
+    // desktop as exporta para ele; repassamos as nossas quando existem.
+    for chave in [
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+    ] {
+        if let Ok(valor) = std::env::var(chave) {
+            cmd.arg(format!("--setenv={chave}={valor}"));
+        }
+    }
+
+    cmd.arg("--").arg(&p.exe).arg("-ConfigFile").arg(&p.config);
+
+    // `output()` em vez de `spawn()`: o systemd-run so entrega o servico e sai,
+    // e assim colhemos tanto o codigo de saida quanto a mensagem de erro dele.
+    let saida = cmd.output().ok()?;
+    Some(if saida.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "nao foi possivel abrir o karaoke: {}",
+            String::from_utf8_lossy(&saida.stderr).trim()
+        ))
+    })
+}
+
 #[tauri::command]
 fn launch() -> Result<(), String> {
     let p = paths::resolve()?;
@@ -705,27 +784,44 @@ fn launch() -> Result<(), String> {
         return Err("o karaoke ainda nao esta instalado.".to_string());
     }
 
+    // O UltraStar e Free Pascal, e a cthreads cria cada TThread com
+    // PTHREAD_EXPLICIT_SCHED — ou seja, pedindo SCHED_OTHER na marra. Se este
+    // processo estiver em SCHED_IDLE, o kernel nega a troca (EPERM, porque o
+    // RLIMIT_NICE padrao e 0) e o karaoke morre com
+    // `EThread: Failed to create new thread` na hora de montar a lista de
+    // musicas. O filho herda a politica, e sair do SCHED_IDLE exige
+    // CAP_SYS_NICE — entao passamos a bola para o systemd do usuario, que roda
+    // em SCHED_OTHER e inicia o karaoke limpo.
+    //
+    // Nao e caso de laboratorio: o ananicy-cpp, ligado por padrao no CachyOS,
+    // poe tudo que descende do `node` em SCHED_IDLE (regra BG_CPUIO) — o que
+    // inclui este painel quando ele sobe por `npm run dev`.
+    #[cfg(not(windows))]
+    if politica_de_agendamento() == Some(SCHED_IDLE) {
+        if let Some(resultado) = launch_pelo_systemd(&p) {
+            return resultado;
+        }
+    }
+
     let mut cmd = Command::new(&p.exe);
     cmd.arg("-ConfigFile").arg(&p.config);
     cmd.current_dir(&p.app_dir);
 
     #[cfg(not(windows))]
-    {
-        let lib = p.app_dir.join("usr").join("lib");
-        let atual = std::env::var("LD_LIBRARY_PATH").unwrap_or_default();
-        let novo = if atual.is_empty() {
-            lib.to_string_lossy().to_string()
-        } else {
-            format!("{}:{atual}", lib.display())
-        };
-        cmd.env("LD_LIBRARY_PATH", novo);
-    }
+    cmd.env("LD_LIBRARY_PATH", ld_library_path(&p));
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    cmd.spawn()
-        .map(|_| ())
-        .map_err(|e| format!("nao foi possivel abrir o karaoke: {e}"))
+    let mut filho = cmd
+        .spawn()
+        .map_err(|e| format!("nao foi possivel abrir o karaoke: {e}"))?;
+
+    // O painel fica aberto a festa inteira; sem colher o filho, cada rodada de
+    // karaoke deixa um zumbi na tabela de processos.
+    std::thread::spawn(move || {
+        let _ = filho.wait();
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -802,6 +898,31 @@ mod tests {
         assert_eq!(&ICON_256[..4], b"\x89PNG");
         #[cfg(windows)]
         assert_eq!(&ICON_ICO[..4], &[0x00, 0x00, 0x01, 0x00]);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn le_a_politica_de_agendamento_do_stat() {
+        // Nome de executavel com espaco e parenteses dentro: o `)` do nome nao
+        // pode confundir a contagem dos campos.
+        // Campo 3 (estado), os campos 4 a 40, e ai o 41 — a politica.
+        let miolo = ["0"; 37].join(" ");
+        let stat = format!("1234 (ultra star (x)) S {miolo} 5 0 0");
+        assert_eq!(politica_do_stat(&stat), Some(SCHED_IDLE));
+
+        // O nosso proprio processo tem que ter uma politica legivel.
+        assert!(politica_de_agendamento().is_some());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn as_libs_do_appimage_vem_na_frente() {
+        let p = paths::resolve().unwrap();
+        let esperado = p.app_dir.join("usr").join("lib");
+        assert!(
+            ld_library_path(&p).starts_with(&esperado.to_string_lossy().to_string()),
+            "as libs da instalacao tem que ganhar das do sistema"
+        );
     }
 
     #[test]

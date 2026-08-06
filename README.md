@@ -277,12 +277,22 @@ apenas no caminho compartilhado da própria instalação. Um tema em
 `config.ini` de volta para `Theme=Modern`, sem avisar. É por isso que o
 instalador extrai o AppImage em vez de usá-lo direto.
 
-**2. Quem abre o karaokê chama o binário direto, não o `AppRun`.** Com a
-instalação extraída em disco, iniciar pelo `AppRun` quebra o app com
-`EThread: Failed to create new thread` durante o carregamento das músicas. O
-AppImage original, não extraído, não tem esse problema — o defeito só aparece na
-combinação AppRun + instalação extraída. Por isso o botão "Abrir o karaokê"
-monta o `LD_LIBRARY_PATH` na mão e executa `usr/bin/ultrastardx`.
+**2. O karaokê não sobrevive ao `SCHED_IDLE`.** Se o painel estiver na classe de
+agendamento ociosa, o UltraStar morre com
+`EThread: Failed to create new thread` bem na hora de montar a lista de músicas.
+A cthreads do Free Pascal cria cada `TThread` com `PTHREAD_EXPLICIT_SCHED`, isto
+é, pedindo `SCHED_OTHER` explicitamente; o filho herdou `SCHED_IDLE` e o kernel
+nega a volta com `EPERM`, porque o `RLIMIT_NICE` padrão é 0. Sair do
+`SCHED_IDLE` exigiria `CAP_SYS_NICE`, então o botão "Abrir o karaokê" detecta a
+situação e entrega a partida a um serviço transitório do systemd do usuário, que
+roda em `SCHED_OTHER`.
+
+Quem põe o painel em `SCHED_IDLE` é o **ananicy-cpp**, ligado por padrão no
+CachyOS: a regra `node` → `BG_CPUIO` marca `nice 16` + `sched idle`, e tudo que
+desce do `node` herda — inclusive o painel iniciado por `npm run dev`. Fora do
+`SCHED_IDLE` nada muda: o binário é executado direto, com o `LD_LIBRARY_PATH`
+montado na mão apontando para as libs do AppImage extraído (e é `usr/bin/ultrastardx`,
+não o `AppRun`, que na instalação extraída é só um symlink para ele).
 
 **3. A configuração fica num arquivo próprio**, passado via `-ConfigFile`. Sem
 isso, abrir um UltraStar comum na mesma máquina reescreve o tema de volta para o
