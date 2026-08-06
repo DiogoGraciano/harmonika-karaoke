@@ -1,6 +1,6 @@
 [package]
 name = "instalador-harmonika-karaoke"
-version = "1.0.0"
+version = "1.0.1"
 description = "Instalador do Harmonika&Co Karaoke (UltraStar Deluxe + tema da empresa)"
 authors = ["Harmonika&Co"]
 license = "MIT"
