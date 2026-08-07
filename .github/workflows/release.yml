@@ -45,10 +45,12 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev
 
-      - name: Node
-        uses: actions/setup-node@v4
+      # O tauri-action escolhe o gerenciador pelo lockfile versionado
+      # (bun.lock), entao o bun precisa existir no runner.
+      - name: Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
+          bun-version: latest
 
       - name: Rust
         uses: dtolnay/rust-toolchain@stable
@@ -58,8 +60,8 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
-      - name: Instalar dependências npm
-        run: npm install
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
 
       # Os testes cobrem a geracao do tema, que e o que faz o instalador
       # entregar a identidade visual certa. Falhou aqui, nao publica.
